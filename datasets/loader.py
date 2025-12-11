@@ -6,7 +6,7 @@ Provides standardized interface for loading QA datasets.
 
 import logging
 from typing import Dict, List, Any, Optional
-from datasets import load_dataset
+from datasets import load_dataset as hf_load_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class DatasetLoader:
     
     def _load_ms_marco(self, split: str, max_samples: Optional[int]) -> List[Dict[str, Any]]:
         """Load MS MARCO dataset."""
-        dataset = load_dataset("ms_marco", "v2.1", split=split if split != "validation" else "dev")
+        dataset = hf_load_dataset("ms_marco", "v2.1", split=split if split != "validation" else "dev")
         
         if max_samples:
             dataset = dataset.select(range(min(max_samples, len(dataset))))
@@ -124,7 +124,7 @@ class DatasetLoader:
     
     def _load_pubmedqa(self, split: str, max_samples: Optional[int]) -> List[Dict[str, Any]]:
         """Load PubMedQA dataset."""
-        dataset = load_dataset("pubmed_qa", "pqa_labeled", split=split if split == "train" else "test")
+        dataset = hf_load_dataset("pubmed_qa", "pqa_labeled", split=split if split == "train" else "test")
         
         if max_samples:
             dataset = dataset.select(range(min(max_samples, len(dataset))))
@@ -153,7 +153,7 @@ class DatasetLoader:
     def _load_asqa(self, split: str, max_samples: Optional[int]) -> List[Dict[str, Any]]:
         """Load ASQA dataset (Answer Sentence QA with citations)."""
         try:
-            dataset = load_dataset("din0s/asqa", split=split if split == "train" else "dev")
+            dataset = hf_load_dataset("din0s/asqa", split=split if split == "train" else "dev")
         except:
             logger.warning("ASQA dataset not available via datasets library")
             return []
@@ -187,7 +187,7 @@ class DatasetLoader:
     
     def _load_squad(self, split: str, max_samples: Optional[int]) -> List[Dict[str, Any]]:
         """Load SQuAD v2 dataset."""
-        dataset = load_dataset("squad_v2", split=split)
+        dataset = hf_load_dataset("squad_v2", split=split)
         
         if max_samples:
             dataset = dataset.select(range(min(max_samples, len(dataset))))
@@ -219,7 +219,7 @@ class DatasetLoader:
             split = "validation"
         
         try:
-            dataset = load_dataset("nq_open", split=split, trust_remote_code=True)
+            dataset = hf_load_dataset("nq_open", split=split, trust_remote_code=True)
         except Exception as e:
             logger.error(f"Failed to load NQ Open: {e}")
             return []
@@ -254,7 +254,7 @@ class DatasetLoader:
     ) -> List[Dict[str, Any]]:
         """Load TriviaQA dataset."""
         config = config or "unfiltered"
-        dataset = load_dataset("trivia_qa", config, split=split)
+        dataset = hf_load_dataset("trivia_qa", config, split=split)
         
         if max_samples:
             dataset = dataset.select(range(min(max_samples, len(dataset))))
@@ -281,7 +281,7 @@ class DatasetLoader:
     
     def _load_hotpotqa(self, split: str, max_samples: Optional[int]) -> List[Dict[str, Any]]:
         """Load HotpotQA dataset."""
-        dataset = load_dataset("hotpot_qa", "distractor", split=split)
+        dataset = hf_load_dataset("hotpot_qa", "distractor", split=split)
         
         if max_samples:
             dataset = dataset.select(range(min(max_samples, len(dataset))))

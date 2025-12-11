@@ -2,7 +2,7 @@
 
 import logging
 from typing import Dict, List
-from datasets import load_dataset
+from datasets import load_dataset as hf_load_dataset
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +81,7 @@ class StandardCorpus:
     @staticmethod
     def _load_squad(max_documents: int, min_length: int) -> List[Dict]:
         """Load SQuAD v2 contexts."""
-        dataset = load_dataset('squad_v2', split='train', trust_remote_code=True)
+        dataset = hf_load_dataset('squad_v2', split='train', trust_remote_code=True)
         
         documents = []
         seen_contexts = set()
@@ -116,7 +116,7 @@ class StandardCorpus:
     @staticmethod
     def _load_hotpotqa(max_documents: int, min_length: int) -> List[Dict]:
         """Load HotpotQA contexts."""
-        dataset = load_dataset('hotpot_qa', 'distractor', split='train', trust_remote_code=True)
+        dataset = hf_load_dataset('hotpot_qa', 'distractor', split='train', trust_remote_code=True)
         
         documents = []
         seen_texts = set()
