@@ -1,0 +1,199 @@
+experiment:
+  name: "quantization-rag-evaluation"
+  description: "Comprehensive evaluation of quantization methods on RAG performance"
+  hardware: "T4 GPU (16GB VRAM)"
+  base_model: "mistralai/Mistral-7B-v0.1"
+
+models:
+  fp16_baseline:
+    path: "mistralai/Mistral-7B-v0.1"
+    type: "hf"
+    description: "FP16 baseline"
+
+  nf4:
+    path: "mistralai/Mistral-7B-v0.1"
+    type: "bitsandbytes"
+    description: "NF4 quantization"
+    config:
+      load_in_4bit: true
+      bnb_4bit_quant_type: "nf4"
+      bnb_4bit_use_double_quant: true
+      bnb_4bit_compute_dtype: "float16"
+
+  gptq:
+    path: "TheBloke/Mistral-7B-GPTQ"
+    type: "gptq"
+    description: "GPTQ 4-bit (group_size=128)"
+
+  awq:
+    path: "TheBloke/Mistral-7B-AWQ"
+    type: "awq"
+    description: "AWQ 4-bit (group_size=128)"
+
+  hqq:
+    path: "mistralai/Mistral-7B-v0.1"
+    type: "hqq"
+    description: "HQQ 4-bit (group_size=64)"
+
+lm_eval:
+  enabled: false
+
+  baseline_reasoning:
+    tasks:
+      - hellaswag
+      - winogrande
+      - piqa
+      - arc_easy
+      - arc_challenge
+    num_fewshot: 0
+    batch_size: 1
+
+  core_rag:
+    tasks:
+      - squad_v2
+      - triviaqa
+    num_fewshot: 0
+    batch_size: 1
+
+  rag_reasoning:
+    tasks:
+      - drop
+      - race
+    num_fewshot: 3
+    batch_size: 1
+
+  verification:
+    tasks:
+      - boolq
+    num_fewshot: 0
+    batch_size: 1
+
+performance:
+  enabled: true
+  time:
+    num_warmup: 3
+    num_runs: 10
+    max_new_tokens: 128
+    prompts:
+      - "The capital of France is"
+      - "Artificial intelligence is defined as"
+      - "In machine learning, overfitting occurs when"
+      - "Quantum computing differs from classical computing because"
+      - "The theory of relativity states that"
+      - "Natural language processing enables"
+      - "Deep learning models are characterized by"
+      - "The Transformer architecture introduced"
+      - "Reinforcement learning agents learn by"
+      - "Neural networks consist of"
+
+  space:
+    batch_size: 1
+    sequence_length: 2048
+    reset_stats: true
+
+perplexity:
+  enabled: true
+  dataset: "wikitext"
+  config: "wikitext-2-raw-v1"
+  split: "test"
+  max_samples: 100
+  max_length: 512
+  min_text_length: 100
+
+context_length:
+  enabled: true
+  context_lengths: [512, 1024, 2048, 4096]
+  samples_per_length: 25
+  test_positions: ["start", "middle", "end"]
+
+rag_benchmarks:
+  context:
+    enabled: true
+    context_lengths: [512, 1024, 2048, 4096]
+    samples_per_length: 25
+    test_positions: ["middle"]
+
+  retrieval:
+    enabled: false
+    questions_file: "data/qa_pairs.json"
+    documents_file: "data/technical_docs.pdf"
+    compare_no_rag: true
+    save_detailed: true
+
+    pipeline_config:
+      chunking:
+        strategy: "semantic"
+        chunk_size: 512
+        chunk_overlap: 50
+        min_chunk_size: 100
+
+      embedding:
+        model_name: "sentence-transformers/all-MiniLM-L6-v2"
+        batch_size: 32
+        normalize: true
+
+      retrieval:
+        top_k: 3
+        similarity_threshold: 0.0
+        rerank: false
+        diversity_penalty: 0.0
+
+      generation:
+        max_new_tokens: 128
+        temperature: 0.3
+        top_p: 0.9
+        do_sample: true
+        repetition_penalty: 1.15
+
+  robustness:
+    enabled: false
+    num_samples: 50
+    noise_ratios: [0.0, 0.2, 0.5]
+    retrieval_ks: [1, 3, 5, 10]
+
+attention:
+  enabled: false
+  num_samples: 50
+  num_documents: 5
+  max_context_length: 512
+  generation_length: 20
+
+datasets:
+  squad:
+    name: "squad_v2"
+    split: "validation"
+    max_samples: 500
+
+  natural_questions:
+    name: "nq_open"
+    split: "validation"
+    max_samples: 500
+
+  triviaqa:
+    name: "trivia_qa"
+    config: "unfiltered"
+    split: "validation"
+    max_samples: 500
+
+  hotpotqa:
+    name: "hotpot_qa"
+    config: "distractor"
+    split: "validation"
+    max_samples: 500
+
+  ms_marco:
+    name: "ms_marco"
+    config: "v2.1"
+    split: "dev"
+    max_samples: 500
+
+output:
+  dir: "results"
+  save_detailed: true
+  log_level: "INFO"
+  formats: ["json", "csv"]
+
+constraints:
+  max_memory_gb: 16
+  device: "cuda:0"
+  precision: "fp16"

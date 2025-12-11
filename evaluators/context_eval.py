@@ -1,0 +1,312 @@
+"""
+Context length evaluator for measuring performance degradation with context size.
+"""
+
+import logging
+import random
+import gc
+import json
+import torch
+import numpy as np
+from typing import Dict, List, Any
+from datasets import load_dataset
+from scipy import stats
+
+from evaluators.base import BaseEvaluator
+from metrics.accuracy import token_f1, substring_match
+from models.model_interface import GenerationConfig
+
+logger = logging.getLogger(__name__)
+
+
+class ContextLengthEvaluator(BaseEvaluator):
+    """
+    Evaluate how model performance degrades as context length increases.
+    
+    Tests:
+    - Performance at different context lengths (512, 1024, 2048, 4096)
+    - Answer position sensitivity (needle-in-haystack)
+    - Degradation rate measurement
+    """
+    
+    def __init__(
+        self,
+        model_interface,
+        context_lengths: List[int] = None,
+        samples_per_length: int = 25,
+        test_positions: List[str] = None
+    ):
+        super().__init__(model_interface)
+        self.context_lengths = context_lengths or [512, 1024, 2048, 4096]
+        self.samples_per_length = samples_per_length
+        self.test_positions = test_positions or ['middle']
+    
+    def run(self) -> Dict[str, Any]:
+        """Run context length evaluation."""
+        logger.info(f"Context lengths: {self.context_lengths}")
+        logger.info(f"Samples per length: {self.samples_per_length}")
+        logger.info(f"Positions: {self.test_positions}")
+        
+        self._load_data()
+        
+        config = GenerationConfig(max_new_tokens=20, do_sample=False)
+        
+        results_by_length = {}
+        results_by_position = {}
+        all_f1_scores = []
+        all_lengths = []
+        
+        for length in self.context_lengths:
+            results_by_length[str(length)] = {}
+            
+            for position in self.test_positions:
+                result = self._evaluate_at_length(length, position, config)
+                
+                results_by_length[str(length)][position] = result
+                
+                all_lengths.append(length)
+                all_f1_scores.append(result['f1'])
+                
+                if position not in results_by_position:
+                    results_by_position[position] = []
+                
+                results_by_position[position].append({
+                    'length': length,
+                    'f1': result['f1'],
+                    'accuracy': result['accuracy']
+                })
+        
+        slope, r_squared = self._compute_degradation(all_lengths, all_f1_scores)
+        
+        position_summary = self._summarize_by_position(results_by_position)
+        
+        self.results = {
+            "by_length": results_by_length,
+            "by_position": position_summary,
+            "degradation": {
+                "slope_per_token": float(slope),
+                "slope_per_1k_tokens": float(slope * 1000),
+                "r_squared": float(r_squared),
+                "interpretation": self._interpret_slope(slope * 1000)
+            },
+            "metadata": {
+                "context_lengths": self.context_lengths,
+                "samples_per_length": self.samples_per_length,
+                "positions_tested": self.test_positions
+            }
+        }
+        
+        self.results = self._convert_to_serializable(self.results)
+        
+        self._print_summary()
+        
+        return self.results
+    
+    def _load_data(self):
+        """Load SQuAD and WikiText datasets."""
+        logger.info("Loading datasets")
+        
+        self.squad = load_dataset("squad_v2", split="validation[:500]")
+        
+        wiki = load_dataset("wikitext", "wikitext-103-v1", split="train[:2000]")
+        self.wiki_passages = [
+            item['text'].strip() 
+            for item in wiki 
+            if len(item['text'].strip()) > 100
+        ][:800]
+        
+        logger.info(f"Loaded {len(self.squad)} questions, {len(self.wiki_passages)} filler passages")
+    
+    def _build_context_at_position(
+        self,
+        answer_context: str,
+        question: str,
+        target_length: int,
+        position: str = 'middle'
+    ) -> str:
+        """Build context with answer at specified position."""
+        answer_tokens = self.model.tokenizer.encode(answer_context)
+        answer_length = len(answer_tokens)
+        
+        if answer_length >= target_length:
+            return self.model.tokenizer.decode(answer_tokens[:target_length])
+        
+        tokens_needed = target_length - answer_length
+        
+        if position == 'start':
+            before_tokens, after_tokens = 0, tokens_needed
+        elif position == 'end':
+            before_tokens, after_tokens = tokens_needed, 0
+        else:
+            before_tokens = tokens_needed // 2
+            after_tokens = tokens_needed - before_tokens
+        
+        before_filler = self._build_filler(before_tokens) if before_tokens > 0 else ""
+        after_filler = self._build_filler(after_tokens) if after_tokens > 0 else ""
+        
+        parts = []
+        if before_filler:
+            parts.append(before_filler)
+        parts.append(answer_context)
+        if after_filler:
+            parts.append(after_filler)
+        
+        combined = "\n\n".join(parts) + f"\n\nQuestion: {question}\nAnswer:"
+        
+        final_tokens = self.model.tokenizer.encode(combined)[:target_length]
+        return self.model.tokenizer.decode(final_tokens, skip_special_tokens=True)
+    
+    def _build_filler(self, num_tokens: int) -> str:
+        """Build filler text of approximately num_tokens length."""
+        if num_tokens <= 0:
+            return ""
+        
+        filler_parts = []
+        current_tokens = 0
+        
+        available = random.sample(
+            self.wiki_passages,
+            min(len(self.wiki_passages), num_tokens // 50 + 10)
+        )
+        
+        for passage in available:
+            if current_tokens >= num_tokens:
+                break
+            
+            passage_tokens = self.model.tokenizer.encode(passage)[:150]
+            filler_parts.append(self.model.tokenizer.decode(passage_tokens))
+            current_tokens += len(passage_tokens)
+        
+        return "\n\n".join(filler_parts)
+    
+    def _evaluate_at_length(
+        self,
+        context_length: int,
+        position: str,
+        config: GenerationConfig
+    ) -> Dict[str, Any]:
+        """Evaluate at specific context length and position."""
+        logger.info(f"Testing {context_length} tokens (answer at {position})")
+        
+        correct = 0
+        f1_scores = []
+        total = 0
+        
+        for sample in self.squad:
+            if total >= self.samples_per_length:
+                break
+            
+            question = sample.get('question', '')
+            context = sample.get('context', '')
+            answers = sample.get('answers', {}).get('text', [])
+            
+            if not question or not answers or not context:
+                continue
+            
+            try:
+                full_context = self._build_context_at_position(
+                    context, question, context_length, position
+                )
+                
+                actual_length = len(self.model.tokenizer.encode(full_context))
+                if actual_length < context_length * 0.85:
+                    continue
+                
+                output = self.model.generate(full_context, config)
+                
+                response = output.generated_text.lower().strip()
+                
+                if substring_match(response, answers[0]):
+                    correct += 1
+                
+                f1 = max(token_f1(output.generated_text, ans) for ans in answers)
+                f1_scores.append(f1)
+                total += 1
+                
+                if total % 5 == 0:
+                    self._cleanup()
+            
+            except RuntimeError as e:
+                if "out of memory" in str(e).lower():
+                    logger.warning(f"OOM at {context_length} tokens")
+                    self._cleanup()
+                    break
+            except Exception:
+                continue
+        
+        accuracy = correct / total if total > 0 else 0.0
+        mean_f1 = float(np.mean(f1_scores)) if f1_scores else 0.0
+        
+        logger.info(f"Results: Acc={accuracy:.3f}, F1={mean_f1:.3f}, Samples={total}")
+        
+        return {
+            'accuracy': float(accuracy),
+            'f1': mean_f1,
+            'num_samples': total,
+            'answer_position': position
+        }
+    
+    def _compute_degradation(self, lengths: List[int], f1_scores: List[float]):
+        """Compute degradation slope and R-squared."""
+        if len(f1_scores) < 2:
+            return 0.0, 0.0
+        
+        lengths_array = np.array(lengths)
+        f1_array = np.array(f1_scores)
+        
+        slope, intercept, r_value, p_value, std_err = stats.linregress(
+            lengths_array, f1_array
+        )
+        
+        r_squared = r_value ** 2
+        
+        logger.info(f"Degradation: {slope * 1000:.4f} per 1K tokens, R²={r_squared:.3f}")
+        
+        return slope, r_squared
+    
+    def _summarize_by_position(self, results_by_position: Dict) -> Dict:
+        """Summarize results by answer position."""
+        summary = {}
+        
+        for position, data in results_by_position.items():
+            f1_values = [d['f1'] for d in data]
+            summary[position] = {
+                'mean_f1': float(np.mean(f1_values)),
+                'std_f1': float(np.std(f1_values)),
+                'min_f1': float(np.min(f1_values)),
+                'max_f1': float(np.max(f1_values))
+            }
+        
+        return summary
+    
+    @staticmethod
+    def _interpret_slope(slope_per_1k: float) -> str:
+        """Interpret degradation slope."""
+        abs_slope = abs(slope_per_1k)
+        if abs_slope < 0.001:
+            return "negligible"
+        elif abs_slope < 0.01:
+            return "minimal"
+        elif abs_slope < 0.05:
+            return "moderate"
+        else:
+            return "significant"
+    
+    def _cleanup(self):
+        """Aggressive memory cleanup."""
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+            torch.cuda.synchronize()
+    
+    def _print_summary(self):
+        """Print formatted summary."""
+        logger.info("Context Length Summary:")
+        
+        for length, data in self.results['by_length'].items():
+            logger.info(f"{length} tokens:")
+            for position, metrics in data.items():
+                logger.info(f"  {position}: F1={metrics['f1']:.3f}, Acc={metrics['accuracy']:.3f}")
+        
+        deg = self.results['degradation']
+        logger.info(f"Degradation: {deg['slope_per_1k_tokens']:.4f} per 1K tokens ({deg['interpretation']})")
