@@ -9,6 +9,12 @@ auto-gptq>=0.7.1
 bitsandbytes>=0.44.0
 optimum>=1.21.0
 
+# ExLlamaV2 for GPTQ inference
+exllamav2>=0.0.18
+
+# HQQ quantization
+hqq>=0.1.0
+
 # Datasets and evaluation
 datasets>=2.20.0
 scipy>=1.11.0
@@ -23,6 +29,9 @@ nltk>=3.8.1
 # Metrics
 rouge-score>=0.1.2
 evaluate>=0.4.0
+
+# LM-Eval harness
+lm-eval>=0.4.0
 
 # Utilities
 PyYAML>=6.0.1
