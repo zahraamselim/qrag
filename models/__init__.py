@@ -14,8 +14,8 @@ __all__ = [
     'ModelInterface',
     'GenerationConfig',
     'ModelOutput',
-    'AWQModel',
+    # 'AWQModel',
     'HuggingFaceModel',
-    'BitsAndBytesModel',
-    'ExLlamaModel'
+    # 'BitsAndBytesModel',
+    # 'ExLlamaModel'
 ]

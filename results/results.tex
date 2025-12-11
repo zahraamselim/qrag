@@ -1,0 +1,522 @@
+\section{Results}
+
+% ============================================================================
+\subsection{LM-Eval Benchmarks}
+% ============================================================================
+
+\subsubsection{Baseline Reasoning Tasks}
+
+\begin{table}[h]
+\centering
+\caption{Performance on Commonsense Reasoning Benchmarks}
+\label{tab:baseline_reasoning}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Model} & \textbf{Hellaswag} & \textbf{WinoGrande} & \textbf{PIQA} & \textbf{ARC-Easy} & \textbf{ARC-Challenge} \\
+\midrule
+FP16 Baseline & 0.72 & --- & --- & 0.76 & 0.58 \\
+NF4 & 0.70 & --- & --- & 0.75 & 0.58 \\
+GPTQ & 0.68 & --- & --- & 0.75 & 0.60 \\
+AWQ & --- & --- & --- & --- & --- \\
+HQQ & --- & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Core RAG Tasks}
+
+\begin{table}[h]
+\centering
+\caption{Reading Comprehension Performance (SQuADv2)}
+\label{tab:core_rag}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Model} & \textbf{Exact Match} & \textbf{F1} & \textbf{HasAns EM} & \textbf{HasAns F1} & \textbf{NoAns F1} \\
+\midrule
+FP16 Baseline & --- & --- & --- & --- & --- \\
+NF4 & --- & --- & --- & --- & --- \\
+GPTQ & --- & --- & --- & --- & --- \\
+AWQ & --- & --- & --- & --- & --- \\
+HQQ & --- & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{RAG Reasoning Tasks}
+
+\begin{table}[h]
+\centering
+\caption{Complex Reasoning over Context (DROP, 3-shot)}
+\label{tab:rag_reasoning}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Model} & \textbf{Exact Match} & \textbf{F1} & \textbf{Date Understanding} \\
+\midrule
+FP16 Baseline & --- & --- & --- \\
+NF4 & --- & --- & --- \\
+GPTQ & --- & --- & --- \\
+AWQ & --- & --- & --- \\
+HQQ & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+\subsubsection{Verification Tasks}
+
+\begin{table}[h]
+\centering
+\caption{Binary Fact Verification (BoolQ)}
+\label{tab:verification}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Model} & \textbf{Accuracy} & \textbf{Calibration Error} \\
+\midrule
+FP16 Baseline & --- & --- \\
+NF4 & --- & --- \\
+GPTQ & --- & --- \\
+AWQ & --- & --- \\
+HQQ & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+% ============================================================================
+\subsection{Performance Metrics}
+% ============================================================================
+
+\subsubsection{Inference Performance}
+
+\begin{table}[h]
+\centering
+\caption{Latency and Throughput Metrics}
+\label{tab:performance}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Model} & \textbf{Latency} & \textbf{Throughput} & \textbf{TTFT} \\
+ & \textbf{(ms/token)} & \textbf{(tokens/s)} & \textbf{(ms)} \\
+\midrule
+FP16 Baseline & 62.48 $\pm$ 0.13 & 15.97 $\pm$ 0.03 & 68.30 $\pm$ 0.11 \\
+NF4 & 81.12 $\pm$ 0.44 & 12.30 $\pm$ 0.07 & 177.16 $\pm$ 4.02 \\
+GPTQ & 1136.80 $\pm$ 1.12 & 0.88 $\pm$ 0.001 & 1113.00 $\pm$ 1.70 \\
+AWQ & 78.68 $\pm$ 0.88 & 12.79 $\pm$ 0.03 & 79.25 $\pm$ 0.80 \\
+HQQ & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Memory Footprint}
+
+\begin{table}[h]
+\centering
+\caption{Memory Usage Statistics}
+\label{tab:memory}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{Peak Memory} & \textbf{Allocated} & \textbf{Reserved} & \textbf{Model Size} \\
+ & \textbf{(MB)} & \textbf{(MB)} & \textbf{(MB)} & \textbf{(GB)} \\
+\midrule
+FP16 Baseline & 7010.65 & --- & --- & 13.49 \\
+NF4 & 1859.11 & --- & --- & 3.74 \\
+GPTQ & 4415.90 & --- & --- & 3.87 \\
+AWQ & 1869.04 & --- & --- & 3.87 \\
+HQQ & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+\newpage
+% ============================================================================
+\subsection{Perplexity Evaluation}
+% ============================================================================
+
+\begin{table}[h]
+\centering
+\caption{Perplexity on Standard Datasets}
+\label{tab:perplexity}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\multirow{2}{*}{\textbf{Model}} & \multicolumn{2}{c}{\textbf{WikiText-2}} & & \multicolumn{2}{c}{\textbf{UltraChat}} \\
+\cmidrule{2-3} \cmidrule{5-6}
+ & \textbf{PPL} & \textbf{Loss} & & \textbf{PPL} & \textbf{Loss} \\
+\midrule
+FP16 Baseline & 12.788 & --- & & --- & --- \\
+NF4 & 13.016 & --- & & --- & --- \\
+GPTQ & 12.854 & --- & & --- & --- \\
+AWQ & 13.474 & --- & & --- & --- \\
+HQQ & --- & --- & & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Perplexity Evaluation Metadata}
+\label{tab:perplexity_meta}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Dataset} & \textbf{Samples} & \textbf{Total Tokens} \\
+\midrule
+WikiText-2 & 100 & 40,000--50,000 \\
+UltraChat & 50 & 20,000--25,000 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+% ============================================================================
+\subsection{Context Length Degradation}
+% ============================================================================
+
+\subsubsection{Performance by Context Length}
+
+\begin{table}[h]
+\centering
+\caption{F1 Score Degradation Across Context Lengths}
+\label{tab:context_length}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Context Length} & \textbf{Start Position} & \textbf{Middle Position} & \textbf{End Position} & \textbf{Mean F1} \\
+\midrule
+\multicolumn{5}{c}{\textit{FP16 Baseline}} \\
+\midrule
+512 tokens & --- & --- & --- & --- \\
+1024 tokens & --- & --- & --- & --- \\
+2048 tokens & --- & --- & --- & --- \\
+4096 tokens & --- & --- & --- & --- \\
+\midrule
+\multicolumn{5}{c}{\textit{NF4}} \\
+\midrule
+512 tokens & --- & --- & --- & --- \\
+1024 tokens & --- & --- & --- & --- \\
+2048 tokens & --- & --- & --- & --- \\
+4096 tokens & --- & --- & --- & --- \\
+\midrule
+\multicolumn{5}{c}{\textit{GPTQ}} \\
+\midrule
+512 tokens & --- & --- & --- & --- \\
+1024 tokens & --- & --- & --- & --- \\
+2048 tokens & --- & --- & --- & --- \\
+4096 tokens & --- & --- & --- & --- \\
+\midrule
+\multicolumn{5}{c}{\textit{AWQ}} \\
+\midrule
+512 tokens & --- & --- & --- & --- \\
+1024 tokens & --- & --- & --- & --- \\
+2048 tokens & --- & --- & --- & --- \\
+4096 tokens & --- & --- & --- & --- \\
+\midrule
+\multicolumn{5}{c}{\textit{HQQ}} \\
+\midrule
+512 tokens & --- & --- & --- & --- \\
+1024 tokens & --- & --- & --- & --- \\
+2048 tokens & --- & --- & --- & --- \\
+4096 tokens & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+\subsubsection{Degradation Analysis}
+
+\begin{table}[h]
+\centering
+\caption{Context Length Degradation Metrics}
+\label{tab:degradation}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Metric} & \textbf{Value} & \textbf{Interpretation} \\
+\midrule
+\multicolumn{3}{c}{\textit{FP16 Baseline}} \\
+\midrule
+Slope per 1K tokens & --- & --- \\
+R-squared & --- & --- \\
+\midrule
+\multicolumn{3}{c}{\textit{NF4}} \\
+\midrule
+Slope per 1K tokens & --- & --- \\
+R-squared & --- & --- \\
+\midrule
+\multicolumn{3}{c}{\textit{GPTQ}} \\
+\midrule
+Slope per 1K tokens & --- & --- \\
+R-squared & --- & --- \\
+\midrule
+\multicolumn{3}{c}{\textit{AWQ}} \\
+\midrule
+Slope per 1K tokens & --- & --- \\
+R-squared & --- & --- \\
+\midrule
+\multicolumn{3}{c}{\textit{HQQ}} \\
+\midrule
+Slope per 1K tokens & --- & --- \\
+R-squared & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+\subsubsection{Position Sensitivity Summary}
+
+\begin{table}[h]
+\centering
+\caption{Answer Position Sensitivity Statistics}
+\label{tab:position_stats}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Position} & \textbf{Mean F1} & \textbf{Std F1} & \textbf{Min F1} & \textbf{Max F1} \\
+\midrule
+\multicolumn{5}{c}{\textit{FP16 Baseline}} \\
+\midrule
+Start & --- & --- & --- & --- \\
+Middle & --- & --- & --- & --- \\
+End & --- & --- & --- & --- \\
+\midrule
+\multicolumn{5}{c}{\textit{NF4}} \\
+\midrule
+Start & --- & --- & --- & --- \\
+Middle & --- & --- & --- & --- \\
+End & --- & --- & --- & --- \\
+\midrule
+\multicolumn{5}{c}{\textit{GPTQ}} \\
+\midrule
+Start & --- & --- & --- & --- \\
+Middle & --- & --- & --- & --- \\
+End & --- & --- & --- & --- \\
+\midrule
+\multicolumn{5}{c}{\textit{AWQ}} \\
+\midrule
+Start & --- & --- & --- & --- \\
+Middle & --- & --- & --- & --- \\
+End & --- & --- & --- & --- \\
+\midrule
+\multicolumn{5}{c}{\textit{HQQ}} \\
+\midrule
+Start & --- & --- & --- & --- \\
+Middle & --- & --- & --- & --- \\
+End & --- & --- & --- & --- \\
+\midrule
+\textit{Exp. Start} & \textit{0.72--0.80} & \textit{0.08--0.12} & \textit{0.55--0.65} & \textit{0.85--0.92} \\
+\textit{Exp. Middle} & \textit{0.65--0.75} & \textit{0.10--0.15} & \textit{0.48--0.58} & \textit{0.80--0.88} \\
+\textit{Exp. End} & \textit{0.68--0.78} & \textit{0.09--0.13} & \textit{0.52--0.62} & \textit{0.82--0.90} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+% ============================================================================
+\subsection{RAG System Evaluation}
+% ============================================================================
+
+\subsubsection{Retrieval Quality}
+
+\begin{table}[h]
+\centering
+\caption{Retrieval Quality Metrics on SQuADv2}
+\label{tab:retrieval_quality}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{Context} & \textbf{Answer} & \textbf{Avg Retrieval} & \textbf{Avg Context} \\
+ & \textbf{Sufficiency} & \textbf{Coverage} & \textbf{Score} & \textbf{Length (words)} \\
+\midrule
+FP16 Baseline & 0.757 & 0.716 & 0.785 & 1237.1 \\
+NF4 & 0.796 & 0.756 & 0.800 & 1308.45 \\
+GPTQ & --- & --- & --- & --- \\
+AWQ & 0.796 & 0.756 & 0.800 & 1308.45 \\
+HQQ & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Answer Quality}
+
+\begin{table}[h]
+\centering
+\caption{Answer Quality with and without RAG}
+\label{tab:answer_quality}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Model} & \textbf{Exact Match} & \textbf{F1 Score} & \textbf{Faithfulness} & \textbf{ROUGE-1} & \textbf{ROUGE-L} \\
+\midrule
+\multicolumn{6}{c}{\textit{With RAG}} \\
+\midrule
+FP16 Baseline & 0.0 & 0.183 & 0.414 & 0.234 & 0.169 \\
+NF4 & 0.0 & 0.205 & 0.539 & 0.244 & 0.177 \\
+GPTQ & --- & --- & --- & --- & --- \\
+AWQ & 0.0 & 0.191 & 0.476 & 0.243 & 0.181 \\
+HQQ & --- & --- & --- & --- & --- \\
+\midrule
+\multicolumn{6}{c}{\textit{Without RAG (Baseline)}} \\
+\midrule
+FP16 Baseline & 0.0 & 0.172 & --- & --- & --- \\
+NF4 & 0.0 & 0.181 & --- & --- & --- \\
+GPTQ & --- & --- & --- & --- & --- \\
+AWQ & 0.0 & 0.165 & --- & --- & --- \\
+HQQ & --- & --- & --- & --- & --- \\
+\midrule
+\textit{Exp. w/ RAG} & \textit{0.55--0.65} & \textit{0.70--0.80} & \textit{0.75--0.85} & \textit{0.60--0.70} & \textit{0.55--0.65} \\
+\textit{Exp. w/o RAG} & \textit{0.20--0.35} & \textit{0.30--0.45} & \textit{-} & \textit{0.25--0.40} & \textit{0.22--0.37} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+\subsubsection{RAG Improvement}
+
+\begin{table}[h]
+\centering
+\caption{RAG vs No-RAG Performance Gains}
+\label{tab:rag_improvement}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+\textbf{Model} & \textbf{F1 Gain} & \textbf{F1 Gain (\%)} & \textbf{EM Gain} \\
+\midrule
+FP16 Baseline & 0.011 & 6.2\% & 0.0 \\
+NF4 & 0.024 & 13.2\% & 0.0 \\
+GPTQ & --- & --- & --- \\
+AWQ & 0.025 & 15.4\% & 0.0 \\
+HQQ & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Efficiency Metrics}
+
+\begin{table}[h]
+\centering
+\caption{RAG System Efficiency}
+\label{tab:rag_efficiency}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+\textbf{Model} & \textbf{Retrieval Time} & \textbf{RAG Gen Time} & \textbf{No-RAG Gen Time} & \textbf{RAG Overhead} \\
+ & \textbf{(ms)} & \textbf{(ms)} & \textbf{(ms)} & \textbf{(\%)} \\
+\midrule
+FP16 Baseline & 23.68 & 6531.95 & 7559.32 & -13.6\% \\
+NF4 & 27.97 & 10443.94 & 9964.96 & +4.8\% \\
+GPTQ & --- & --- & --- & --- \\
+AWQ & 26.11 & 9993.86 & 7744.15 & +29.1\% \\
+HQQ & --- & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{RAG Configuration}
+
+\begin{table}[h]
+\centering
+\caption{RAG System Configuration and Metadata}
+\label{tab:rag_config}
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Corpus & SQuADv2 \\
+Documents Indexed & 500 \\
+Test Questions & 100 \\
+Retrieval Top-K & 3 \\
+Chunk Size & 512 tokens \\
+Chunk Overlap & 50 tokens \\
+Embedding Model & sentence-transformers/all-MiniLM-L6-v2 \\
+Chunking Strategy & semantic \\
+Max New Tokens & 64 \\
+Temperature & 0.3 \\
+Avg Chunks per Query & 3.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+% ============================================================================
+\subsection{Summary Comparison}
+% ============================================================================
+
+\begin{table}[h]
+\centering
+\caption{Comprehensive Performance Summary - FP16 Baseline}
+\label{tab:summary}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Evaluation Category} & \textbf{Key Metric} & \textbf{Value} \\
+\midrule
+\multicolumn{3}{c}{\textbf{LM-Eval Benchmarks}} \\
+\midrule
+Reasoning (avg 4 tasks) & Accuracy & 0.528 \\
+SQuAD Reading & F1 Score & --- \\
+DROP Reasoning & F1 Score & --- \\
+BoolQ Verification & Accuracy & --- \\
+\midrule
+\multicolumn{3}{c}{\textbf{Performance}} \\
+\midrule
+Inference & Throughput (tokens/s) & 15.97 \\
+Latency & ms/token & 62.48 \\
+Memory & Peak (MB) & 7010.65 \\
+Model Size & GB & 13.49 \\
+\midrule
+\multicolumn{3}{c}{\textbf{Language Modeling}} \\
+\midrule
+WikiText-2 & Perplexity & 12.788 \\
+UltraChat & Perplexity & --- \\
+\midrule
+\multicolumn{3}{c}{\textbf{Context Length}} \\
+\midrule
+Degradation & Slope per 1K tokens & --- \\
+4096 tokens & Mean F1 & --- \\
+\midrule
+\multicolumn{3}{c}{\textbf{RAG System}} \\
+\midrule
+Answer Quality & F1 Score & 0.183 \\
+Retrieval Quality & Context Sufficiency & 0.757 \\
+RAG Improvement & F1 Gain (\%) & 6.2\% \\
+Faithfulness & Token Overlap & 0.414 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\newpage
+% ============================================================================
+\subsection{Notes and Interpretations}
+% ============================================================================
+
+\subsubsection*{Metric Interpretations}
+
+\textbf{Context Length Degradation}
+\begin{itemize}
+    \item \textbf{Negligible}: $|slope| < 0.001$ per 1K tokens
+    \item \textbf{Minimal}: $0.001 \leq |slope| < 0.01$ per 1K tokens
+    \item \textbf{Moderate}: $0.01 \leq |slope| < 0.05$ per 1K tokens
+    \item \textbf{Significant}: $|slope| \geq 0.05$ per 1K tokens
+\end{itemize}
+
+\textbf{Faithfulness Scores}
+\begin{itemize}
+    \item \textbf{High Faithfulness}: $\geq 0.80$ (answers well-grounded in context)
+    \item \textbf{Moderate Faithfulness}: $0.60$--$0.80$ (some hallucination)
+    \item \textbf{Low Faithfulness}: $< 0.60$ (significant hallucination)
+\end{itemize}
+
+\textbf{RAG Improvement}
+\begin{itemize}
+    \item Positive F1 gain indicates RAG provides useful context
+    \item Typical gains: 80--120\% improvement over no-RAG baseline
+    \item Overhead: 20--40\% additional latency for retrieval + context
+\end{itemize}
+
+\subsubsection*{Dataset Details}
+
+\begin{itemize}
+    \item \textbf{WikiText-2}: 100 samples, 512 max tokens, validation split
+    \item \textbf{UltraChat}: 50 samples, 512 max tokens, train\_sft split
+    \item \textbf{SQuAD v2}: 100 questions, 500 documents indexed
+    \item \textbf{Context Length}: 25 samples per length, positions: start/middle/end
+\end{itemize}
+
+\subsubsection*{Generation Settings}
+
+\begin{itemize}
+    \item \textbf{Performance}: greedy decoding, 128 max tokens, 10 runs + 3 warmup
+    \item \textbf{Context Length}: greedy decoding, 20 max tokens
+    \item \textbf{RAG}: temperature 0.3, top-p 0.9, 64 max tokens, repetition penalty 1.15
+\end{itemize}
