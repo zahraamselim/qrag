@@ -98,12 +98,24 @@ class AWQModel(ModelInterface):
         if inputs.input_ids.size(1) < 2:
             return float('inf')
         
-        with torch.no_grad():
-            outputs = self._model.model(
-                **inputs,
-                labels=inputs["input_ids"]
-            )
-            loss = outputs.loss
+        try:
+            with torch.no_grad():
+                if hasattr(self._model, 'model'):
+                    outputs = self._model.model(**inputs, labels=inputs["input_ids"])
+                else:
+                    outputs = self._model(**inputs, labels=inputs["input_ids"])
+                loss = outputs.loss
+        except (AttributeError, TypeError):
+            with torch.no_grad():
+                outputs = self._model(**inputs)
+                logits = outputs.logits
+                shift_logits = logits[..., :-1, :].contiguous()
+                shift_labels = inputs["input_ids"][..., 1:].contiguous()
+                loss_fct = torch.nn.CrossEntropyLoss()
+                loss = loss_fct(
+                    shift_logits.view(-1, shift_logits.size(-1)),
+                    shift_labels.view(-1)
+                )
         
         return torch.exp(loss).item()
     

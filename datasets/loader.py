@@ -214,12 +214,15 @@ class DatasetLoader:
     
     def _load_nq(self, split: str, max_samples: Optional[int]) -> List[Dict[str, Any]]:
         """Load Natural Questions Open dataset."""
-        if split == "validation":
-            split = "validation"
-        elif split == "test":
+        if split not in ["train", "validation"]:
+            logger.warning(f"NQ Open doesn't have '{split}', using 'validation'")
             split = "validation"
         
-        dataset = load_dataset("nq_open", split=split)
+        try:
+            dataset = load_dataset("nq_open", split=split, trust_remote_code=True)
+        except Exception as e:
+            logger.error(f"Failed to load NQ Open: {e}")
+            return []
         
         if max_samples:
             dataset = dataset.select(range(min(max_samples, len(dataset))))

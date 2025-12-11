@@ -17,7 +17,7 @@ class PerplexityEvaluator(BaseEvaluator):
     """
     Evaluate model perplexity on standard datasets.
     
-    Supports: WikiText-2, WikiText-103, C4
+    Supports: WikiText-2, UltraChat, Alpaca (instruction-following)
     """
     
     def __init__(
@@ -40,10 +40,19 @@ class PerplexityEvaluator(BaseEvaluator):
     
     def run(self) -> Dict[str, Any]:
         """Run perplexity evaluation."""
-        logger.info(f"Evaluating perplexity on {self.dataset_name}/{self.dataset_config}")
+        logger.info(f"Evaluating perplexity on {self.dataset_name}")
+        if self.dataset_config:
+            logger.info(f"Config: {self.dataset_config}")
         
-        dataset = load_dataset(self.dataset_name, self.dataset_config, split=self.split)
-        dataset = dataset.filter(lambda x: len(x.get("text", "")) > self.min_text_length)
+        if self.dataset_config:
+            dataset = load_dataset(self.dataset_name, self.dataset_config, split=self.split)
+        else:
+            dataset = load_dataset(self.dataset_name, split=self.split)
+        
+        text_field = self._detect_text_field(dataset)
+        logger.info(f"Using text field: {text_field}")
+        
+        dataset = dataset.filter(lambda x: len(x.get(text_field, "")) > self.min_text_length)
         
         logger.info(f"Loaded {len(dataset)} samples")
         
@@ -55,7 +64,7 @@ class PerplexityEvaluator(BaseEvaluator):
         valid_samples = 0
         
         for i in range(min(self.max_samples, len(dataset))):
-            text = dataset[i].get("text", "")
+            text = self._extract_text(dataset[i], text_field)
             
             if not text or len(text) < self.min_text_length:
                 continue
@@ -92,7 +101,7 @@ class PerplexityEvaluator(BaseEvaluator):
         self.results = {
             "perplexity": float(perplexity),
             "loss": float(avg_loss),
-            "dataset": f"{self.dataset_name}/{self.dataset_config}",
+            "dataset": f"{self.dataset_name}" + (f"/{self.dataset_config}" if self.dataset_config else ""),
             "split": self.split,
             "num_samples": valid_samples,
             "total_tokens": sum(token_counts),
@@ -104,3 +113,51 @@ class PerplexityEvaluator(BaseEvaluator):
         logger.info(f"Valid samples: {valid_samples}")
         
         return self.results
+    
+    def _detect_text_field(self, dataset) -> str:
+        """Detect which field contains the text."""
+        if len(dataset) == 0:
+            return "text"
+        
+        sample = dataset[0]
+        
+        if "text" in sample:
+            return "text"
+        elif "messages" in sample:
+            return "messages"
+        elif "prompt" in sample and "completion" in sample:
+            return "prompt_completion"
+        elif "instruction" in sample:
+            return "instruction"
+        else:
+            raise ValueError(f"Unknown dataset format. Available fields: {sample.keys()}")
+    
+    def _extract_text(self, sample: dict, text_field: str) -> str:
+        """Extract text from sample based on field type."""
+        if text_field == "text":
+            return sample.get("text", "")
+        
+        elif text_field == "messages":
+            messages = sample.get("messages", [])
+            if isinstance(messages, list):
+                texts = []
+                for msg in messages:
+                    if isinstance(msg, dict) and "content" in msg:
+                        texts.append(msg["content"])
+                return "\n".join(texts)
+            return str(messages)
+        
+        elif text_field == "prompt_completion":
+            prompt = sample.get("prompt", "")
+            completion = sample.get("completion", "")
+            return f"{prompt}\n{completion}"
+        
+        elif text_field == "instruction":
+            instruction = sample.get("instruction", "")
+            input_text = sample.get("input", "")
+            output = sample.get("output", "")
+            if input_text:
+                return f"{instruction}\n{input_text}\n{output}"
+            return f"{instruction}\n{output}"
+        
+        return ""

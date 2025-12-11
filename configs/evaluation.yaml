@@ -1,43 +1,33 @@
 experiment:
-  name: "quantization-rag-evaluation"
-  description: "Comprehensive evaluation of quantization methods on RAG performance"
-  hardware: "T4 GPU (16GB VRAM)"
-  base_model: "mistralai/Mistral-7B-v0.1"
+  name: "mistral-7b-quantization-rag-evaluation"
+  description: "Quantization effects on Mistral-7B for RAG with long-context"
+  hardware: "Kaggle T4 GPU (16GB VRAM)"
+  base_model: "mistralai/Mistral-7B-Instruct-v0.2"
+  seed: 42
 
 models:
   fp16_baseline:
-    path: "mistralai/Mistral-7B-v0.1"
+    path: "mistralai/Mistral-7B-Instruct-v0.2"
     type: "hf"
     description: "FP16 baseline"
 
-  nf4:
-    path: "mistralai/Mistral-7B-v0.1"
-    type: "bitsandbytes"
-    description: "NF4 quantization"
-    config:
-      load_in_4bit: true
-      bnb_4bit_quant_type: "nf4"
-      bnb_4bit_use_double_quant: true
-      bnb_4bit_compute_dtype: "float16"
+  awq_g128:
+    path: "TheBloke/Mistral-7B-Instruct-v0.2-AWQ"
+    type: "awq"
+    description: "AWQ 4-bit group_size=128"
+
+  awq_g64:
+    path: "solidrust/Mistral-7B-Instruct-v0.2-AWQ"
+    type: "awq"
+    description: "AWQ 4-bit group_size=64"
 
   gptq:
-    path: "TheBloke/Mistral-7B-GPTQ"
+    path: "TheBloke/Mistral-7B-Instruct-v0.2-GPTQ"
     type: "gptq"
-    description: "GPTQ 4-bit (group_size=128)"
-
-  awq:
-    path: "TheBloke/Mistral-7B-AWQ"
-    type: "awq"
-    description: "AWQ 4-bit (group_size=128)"
-
-  hqq:
-    path: "mistralai/Mistral-7B-v0.1"
-    type: "hqq"
-    description: "HQQ 4-bit (group_size=64)"
+    description: "GPTQ 4-bit"
 
 lm_eval:
-  enabled: false
-
+  enabled: true
   baseline_reasoning:
     tasks:
       - hellaswag
@@ -70,122 +60,71 @@ lm_eval:
 
 performance:
   enabled: true
-  time:
-    num_warmup: 3
-    num_runs: 10
-    max_new_tokens: 128
-    prompts:
-      - "The capital of France is"
-      - "Artificial intelligence is defined as"
-      - "In machine learning, overfitting occurs when"
-      - "Quantum computing differs from classical computing because"
-      - "The theory of relativity states that"
-      - "Natural language processing enables"
-      - "Deep learning models are characterized by"
-      - "The Transformer architecture introduced"
-      - "Reinforcement learning agents learn by"
-      - "Neural networks consist of"
-
-  space:
-    batch_size: 1
-    sequence_length: 2048
-    reset_stats: true
+  num_warmup: 3
+  num_runs: 10
+  max_new_tokens: 128
 
 perplexity:
   enabled: true
-  dataset: "wikitext"
-  config: "wikitext-2-raw-v1"
-  split: "test"
-  max_samples: 100
+  dataset: "HuggingFaceH4/ultrachat_200k"
+  config: null
+  split: "train_sft"
+  max_samples: 50
   max_length: 512
   min_text_length: 100
 
 context_length:
   enabled: true
   context_lengths: [512, 1024, 2048, 4096]
-  samples_per_length: 25
+  samples_per_length: 5
   test_positions: ["start", "middle", "end"]
 
-rag_benchmarks:
-  context:
-    enabled: true
-    context_lengths: [512, 1024, 2048, 4096]
-    samples_per_length: 25
-    test_positions: ["middle"]
+needle_in_haystack:
+  enabled: true
+  context_lengths: [2048, 4096]
+  position_percentiles: [10, 50, 90]
+  num_needles: 3
 
-  retrieval:
-    enabled: false
-    questions_file: "data/qa_pairs.json"
-    documents_file: "data/technical_docs.pdf"
-    compare_no_rag: true
-    save_detailed: true
+rag_evaluation:
+  enabled: true
+  dataset: "squad_v2"
+  max_samples: 100
 
-    pipeline_config:
-      chunking:
-        strategy: "semantic"
-        chunk_size: 512
-        chunk_overlap: 50
-        min_chunk_size: 100
+  pipeline_config:
+    document_processing:
+      remove_headers: true
+      remove_citations: true
+      extract_sections: false
 
-      embedding:
-        model_name: "sentence-transformers/all-MiniLM-L6-v2"
-        batch_size: 32
-        normalize: true
+    chunking:
+      strategy: "semantic"
+      chunk_size: 512
+      chunk_overlap: 50
+      min_chunk_size: 100
 
-      retrieval:
-        top_k: 3
-        similarity_threshold: 0.0
-        rerank: false
-        diversity_penalty: 0.0
+    embedding:
+      model_name: "sentence-transformers/all-MiniLM-L6-v2"
+      batch_size: 32
+      normalize: true
+      device: "cuda"
 
-      generation:
-        max_new_tokens: 128
-        temperature: 0.3
-        top_p: 0.9
-        do_sample: true
-        repetition_penalty: 1.15
+    vector_store:
+      collection_name: "rag_eval"
+      persist_directory: null
 
-  robustness:
-    enabled: false
-    num_samples: 50
-    noise_ratios: [0.0, 0.2, 0.5]
-    retrieval_ks: [1, 3, 5, 10]
+    retrieval:
+      top_k: 3
+      similarity_threshold: 0.0
+      rerank: false
+      diversity_penalty: 0.0
 
-attention:
-  enabled: false
-  num_samples: 50
-  num_documents: 5
-  max_context_length: 512
-  generation_length: 20
-
-datasets:
-  squad:
-    name: "squad_v2"
-    split: "validation"
-    max_samples: 500
-
-  natural_questions:
-    name: "nq_open"
-    split: "validation"
-    max_samples: 500
-
-  triviaqa:
-    name: "trivia_qa"
-    config: "unfiltered"
-    split: "validation"
-    max_samples: 500
-
-  hotpotqa:
-    name: "hotpot_qa"
-    config: "distractor"
-    split: "validation"
-    max_samples: 500
-
-  ms_marco:
-    name: "ms_marco"
-    config: "v2.1"
-    split: "dev"
-    max_samples: 500
+    generation:
+      max_new_tokens: 64
+      temperature: 0.3
+      top_p: 0.9
+      do_sample: true
+      repetition_penalty: 1.15
+      use_chat_template: true
 
 output:
   dir: "results"
@@ -196,4 +135,4 @@ output:
 constraints:
   max_memory_gb: 16
   device: "cuda:0"
-  precision: "fp16"
+  max_context_length: 4096
