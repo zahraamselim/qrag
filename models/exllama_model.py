@@ -10,13 +10,18 @@ import time
 from typing import Dict, Any, List, Optional
 import torch
 from pathlib import Path
-from exllamav2 import (
-    ExLlamaV2,
-    ExLlamaV2Config,
-    ExLlamaV2Cache,
-    ExLlamaV2Tokenizer
-)
-from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
+
+try:
+    from exllamav2 import (
+        ExLlamaV2,
+        ExLlamaV2Config,
+        ExLlamaV2Cache,
+        ExLlamaV2Tokenizer
+    )
+    from exllamav2.generator import ExLlamaV2StreamingGenerator, ExLlamaV2Sampler
+    EXLLAMA_AVAILABLE = True
+except ImportError:
+    EXLLAMA_AVAILABLE = False
 
 from models.model_interface import ModelInterface, GenerationConfig, ModelOutput
 
@@ -25,6 +30,11 @@ class ExLlamaModel(ModelInterface):
     """ExLlamaV2 model implementation for GPTQ quantized models"""
     
     def __init__(self, model_path: str, device: str = "cuda:0"):
+        if not EXLLAMA_AVAILABLE:
+            raise ImportError(
+                "ExLlamaV2 is not installed. Install with: "
+                "pip install exllamav2"
+            )
         super().__init__(model_path, device)
         self._config = None
         self._cache = None
@@ -34,27 +44,22 @@ class ExLlamaModel(ModelInterface):
         """Load model using ExLlamaV2"""
         print(f"Loading GPTQ model with ExLlamaV2: {self.model_path}")
         
-        # Initialize config
         self._config = ExLlamaV2Config()
         self._config.model_dir = self.model_path
         self._config.prepare()
         
-        # Load model
         self._model = ExLlamaV2(self._config)
         self._cache = ExLlamaV2Cache(self._model, lazy=True)
         self._model.load_autosplit(self._cache)
         
-        # Load tokenizer
         self._tokenizer = ExLlamaV2Tokenizer(self._config)
         
-        # Initialize generator
         self._generator = ExLlamaV2StreamingGenerator(
             self._model,
             self._cache,
             self._tokenizer
         )
         
-        # Detect model type from model name
         model_name_lower = self.model_path.lower()
         if "instruct" in model_name_lower or "chat" in model_name_lower:
             self._model_type = "instruct"
@@ -74,23 +79,19 @@ class ExLlamaModel(ModelInterface):
         if return_attentions:
             print("Warning: ExLlamaV2 does not support attention extraction")
         
-        # Setup generation settings
         settings = ExLlamaV2Sampler.Settings()
         settings.temperature = config.temperature
         settings.top_p = config.top_p
         settings.top_k = config.top_k
         settings.token_repetition_penalty = 1.0
         
-        # Reset cache
         self._cache.current_seq_len = 0
         
-        # Encode prompt
         input_ids = self._tokenizer.encode(prompt)
         input_length = input_ids.shape[1]
         
         start_time = time.perf_counter()
         
-        # Generate
         output_text = self._generator.generate_simple(
             prompt,
             settings,
@@ -100,10 +101,8 @@ class ExLlamaModel(ModelInterface):
         
         latency_ms = (time.perf_counter() - start_time) * 1000
         
-        # Extract generated text (remove prompt)
         generated_text = output_text[len(prompt):]
         
-        # Approximate token count
         generated_ids = self._tokenizer.encode(generated_text)
         num_tokens = generated_ids.shape[1]
         
@@ -126,12 +125,10 @@ class ExLlamaModel(ModelInterface):
         if input_ids.shape[-1] < 2:
             return float('inf')
         
-        # Forward pass
         logits = self._model.forward(input_ids, self._cache, input_mask=None)
         if logits.dim() == 3:
             logits = logits.squeeze(0)
         
-        # Calculate loss
         shift_logits = logits[:-1, :]
         shift_labels = input_ids[0, 1:].to(shift_logits.device)
         

@@ -31,18 +31,24 @@ class HuggingFaceModel(ModelInterface):
         self._model = AutoModelForCausalLM.from_pretrained(
             self.model_path,
             torch_dtype=torch.float16,
-            device_map=self.device,
+            device_map=self.device if self.device != "auto" else "auto",
             low_cpu_mem_usage=True
         )
         
-        # Detect model type from model name/config
+        # Update device to actual device after loading
+        if hasattr(self._model, 'device'):
+            self.device = str(self._model.device)
+        elif hasattr(self._model, 'hf_device_map'):
+            # For device_map="auto", get the first device
+            self.device = str(next(iter(self._model.hf_device_map.values())))
+        
         model_name_lower = self.model_path.lower()
         if "instruct" in model_name_lower or "chat" in model_name_lower:
             self._model_type = "instruct"
         else:
             self._model_type = "base"
         
-        print(f"Model loaded on: {self._model.device}")
+        print(f"Model loaded on: {self.device}")
         print(f"Model type detected: {self._model_type}")
     
     @property
@@ -58,7 +64,7 @@ class HuggingFaceModel(ModelInterface):
         attention weights at each decoding step. This is necessary because
         HuggingFace's generate() method doesn't reliably return attentions.
         
-        Research note: Attention extraction adds ~2-3x overhead vs standard generation.
+        Research note: Attention extraction adds 2-3x overhead vs standard generation.
         For large-scale experiments, consider caching or using smaller sample sizes.
         """
         inputs = self._tokenizer(prompt, return_tensors="pt").to(self._model.device)
@@ -68,8 +74,6 @@ class HuggingFaceModel(ModelInterface):
         
         with torch.no_grad():
             if return_attentions:
-                # Custom generation loop for attention extraction
-                # Note: This is slower but necessary for research-grade attention analysis
                 generated_ids = inputs.input_ids.clone()
                 all_attentions = []
                 
@@ -80,15 +84,11 @@ class HuggingFaceModel(ModelInterface):
                         output_attentions=True
                     )
                     
-                    # Capture attention weights from all layers
-                    # Format: tuple of (batch, heads, seq_len, seq_len) per layer
                     all_attentions.append(outputs.attentions)
                     
-                    # Generate next token
                     next_token_logits = outputs.logits[:, -1, :]
                     
                     if config.do_sample:
-                        # Sampling with temperature/top-k/top-p
                         next_token_logits = next_token_logits / config.temperature
                         
                         if config.top_k > 0:
@@ -107,19 +107,16 @@ class HuggingFaceModel(ModelInterface):
                         probs = torch.softmax(next_token_logits, dim=-1)
                         next_token = torch.multinomial(probs, num_samples=1)
                     else:
-                        # Greedy decoding
                         next_token = torch.argmax(next_token_logits, dim=-1, keepdim=True)
                     
                     generated_ids = torch.cat([generated_ids, next_token], dim=-1)
                     
-                    # Early stopping on EOS
                     if next_token.item() == self._tokenizer.eos_token_id:
                         break
                 
                 attentions = all_attentions
                 
             else:
-                # Fast generation without attention extraction
                 outputs = self._model.generate(
                     inputs.input_ids,
                     max_new_tokens=config.max_new_tokens,
@@ -195,7 +192,7 @@ class HuggingFaceModel(ModelInterface):
             "hidden_size": config.hidden_size,
             "vocab_size": config.vocab_size,
             "dtype": dtype,
-            "device": str(self._model.device)
+            "device": self.device
         }
     
     def get_memory_usage(self) -> Dict[str, float]:

@@ -5,20 +5,25 @@ from typing import List, Optional
 from dataclasses import dataclass
 import logging
 
-# Improved NLTK handling
 logger = logging.getLogger(__name__)
 
 try:
     import nltk
     try:
         nltk.data.find('tokenizers/punkt')
+        nltk.data.find('tokenizers/punkt_tab')
     except LookupError:
         logger.info("Downloading NLTK punkt tokenizer...")
-        nltk.download('punkt', quiet=True)
-        logger.info("NLTK punkt tokenizer downloaded successfully")
+        try:
+            nltk.download('punkt', quiet=True)
+            nltk.download('punkt_tab', quiet=True)
+            logger.info("NLTK punkt tokenizer downloaded successfully")
+        except Exception as e:
+            logger.warning(f"Failed to download NLTK data: {e}")
+    NLTK_AVAILABLE = True
 except ImportError:
-    logger.error("NLTK not installed. Install with: pip install nltk")
-    raise
+    logger.warning("NLTK not installed. Install with: pip install nltk")
+    NLTK_AVAILABLE = False
 
 
 @dataclass
@@ -55,11 +60,12 @@ class TextChunker:
         self.chunk_overlap = config.get('chunk_overlap', 50)
         self.min_chunk_size = config.get('min_chunk_size', 100)
         
-        try:
-            self.sent_tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
-        except Exception as e:
-            logger.error(f"Failed to load NLTK sentence tokenizer: {e}")
-            raise
+        self.sent_tokenizer = None
+        if NLTK_AVAILABLE:
+            try:
+                self.sent_tokenizer = nltk.data.load('tokenizers/punkt/english.pickle')
+            except Exception as e:
+                logger.warning(f"Failed to load NLTK sentence tokenizer: {e}")
         
         self._global_chunk_id = 0
         
@@ -117,9 +123,7 @@ class TextChunker:
             if not para or len(para) < 20:
                 continue
             
-            # Check if adding this paragraph exceeds chunk size
             if len(current_chunk) + len(para) > self.chunk_size:
-                # Save current chunk if it's substantial
                 if len(current_chunk) >= self.min_chunk_size:
                     chunks.append(self._create_chunk(
                         current_chunk.strip(),
@@ -127,7 +131,6 @@ class TextChunker:
                         page_num
                     ))
                     
-                    # Add overlap
                     overlap_text = self._get_overlap(current_chunk)
                     start_char = start_char + len(current_chunk) - len(overlap_text)
                     current_chunk = overlap_text + " "
@@ -137,7 +140,6 @@ class TextChunker:
             
             current_chunk += para + "\n\n"
         
-        # Add final chunk
         if len(current_chunk.strip()) >= self.min_chunk_size:
             chunks.append(self._create_chunk(
                 current_chunk.strip(),
@@ -152,11 +154,14 @@ class TextChunker:
         Sentence-based chunking - groups sentences up to chunk_size.
         Good for general text.
         """
-        try:
-            sentences = self.sent_tokenizer.tokenize(text)
-        except Exception as e:
-            logger.warning(f"Sentence tokenization failed: {e}. Falling back to simple split.")
-            # Fallback to simple period-based split
+        if self.sent_tokenizer:
+            try:
+                sentences = self.sent_tokenizer.tokenize(text)
+            except Exception as e:
+                logger.warning(f"Sentence tokenization failed: {e}. Using fallback.")
+                sentences = re.split(r'[.!?]+', text)
+                sentences = [s.strip() + '.' for s in sentences if s.strip()]
+        else:
             sentences = re.split(r'[.!?]+', text)
             sentences = [s.strip() + '.' for s in sentences if s.strip()]
         
@@ -200,7 +205,6 @@ class TextChunker:
         i = 0
         chunk_count = 0
         while i < len(words):
-            # Get chunk_size words
             chunk_words = words[i:i + self.chunk_size]
             chunk_text = ' '.join(chunk_words)
             
@@ -211,8 +215,7 @@ class TextChunker:
             ))
             
             chunk_count += 1
-            # Move forward with overlap
-            i += max(1, self.chunk_size - self.chunk_overlap)  # Ensure we always move forward
+            i += max(1, self.chunk_size - self.chunk_overlap)
         
         return chunks
     
