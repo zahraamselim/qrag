@@ -25,7 +25,7 @@ from evaluators import (
 )
 from rag import RAGPipeline
 from rag.config import StandardCorpus
-from datasets.loader import DatasetLoader
+from dataset_loader import DatasetLoader
 from utils import setup_logging, save_json, get_gpu_info, clear_memory
 
 logger = logging.getLogger(__name__)
