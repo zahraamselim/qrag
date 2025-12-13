@@ -145,29 +145,51 @@ class ExLlamaModel(ModelInterface):
     
     def get_perplexity(self, text: str, max_length: int = 512) -> float:
         """Calculate perplexity on text"""
-        self._cache.current_seq_len = 0
-        
-        input_ids = self._tokenizer.encode(text)
-        if input_ids.shape[-1] > max_length:
-            input_ids = input_ids[:, :max_length]
-        
-        if input_ids.shape[-1] < 2:
+        try:
+            # Reset cache
+            self._cache.current_seq_len = 0
+            
+            # Tokenize input
+            input_ids = self._tokenizer.encode(text)
+            if input_ids.shape[-1] > max_length:
+                input_ids = input_ids[:, :max_length]
+            
+            if input_ids.shape[-1] < 2:
+                return float('inf')
+            
+            # Forward pass - FIXED: use model.forward() correctly
+            logits = self._model.forward(
+                input_ids, 
+                self._cache, 
+                input_mask=None,
+                preprocess_only=False
+            )
+            
+            # Handle logits shape
+            if logits.dim() == 3:
+                logits = logits.squeeze(0)
+            
+            # Compute loss
+            shift_logits = logits[:-1, :]
+            shift_labels = input_ids[0, 1:].to(shift_logits.device)
+            
+            loss = torch.nn.functional.cross_entropy(
+                shift_logits,
+                shift_labels,
+                reduction='mean'
+            )
+            
+            perplexity = torch.exp(loss).item()
+            
+            # Sanity check
+            if perplexity < 0 or torch.isnan(loss) or torch.isinf(loss):
+                return float('inf')
+            
+            return perplexity
+            
+        except Exception as e:
+            print(f"Error computing perplexity: {e}")
             return float('inf')
-        
-        logits = self._model.forward(input_ids, self._cache, input_mask=None)
-        if logits.dim() == 3:
-            logits = logits.squeeze(0)
-        
-        shift_logits = logits[:-1, :]
-        shift_labels = input_ids[0, 1:].to(shift_logits.device)
-        
-        loss = torch.nn.functional.cross_entropy(
-            shift_logits,
-            shift_labels,
-            reduction='mean'
-        )
-        
-        return torch.exp(loss).item()
     
     def encode(self, text: str, max_length: int = None) -> Dict[str, torch.Tensor]:
         """Tokenize text"""
