@@ -17,5 +17,5 @@ __all__ = [
     # 'AWQModel',
     'HuggingFaceModel',
     # 'BitsAndBytesModel',
-    # 'ExLlamaModel'
+    'ExLlamaModel'
 ]
