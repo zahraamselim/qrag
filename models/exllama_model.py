@@ -7,9 +7,10 @@ Focus: Fast inference for quantized models.
 
 import gc
 import time
+import os
 from typing import Dict, Any, List, Optional
-import torch
 from pathlib import Path
+import torch
 
 try:
     from exllamav2 import (
@@ -40,12 +41,40 @@ class ExLlamaModel(ModelInterface):
         self._cache = None
         self._generator = None
     
+    def _resolve_model_path(self, model_path: str) -> str:
+        """Resolve model path from HuggingFace hub or local path."""
+        if os.path.exists(model_path):
+            return model_path
+        
+        try:
+            from huggingface_hub import snapshot_download
+            print(f"Downloading model from HuggingFace Hub: {model_path}")
+            local_path = snapshot_download(
+                repo_id=model_path,
+                allow_patterns=["*.json", "*.safetensors", "*.model"],
+                cache_dir=None
+            )
+            print(f"Model downloaded to: {local_path}")
+            return local_path
+        except ImportError:
+            raise ImportError(
+                "huggingface_hub is required to download models. "
+                "Install with: pip install huggingface_hub"
+            )
+        except Exception as e:
+            raise ValueError(
+                f"Could not find model at {model_path} locally or on HuggingFace Hub. "
+                f"Error: {str(e)}"
+            )
+    
     def load(self):
         """Load model using ExLlamaV2"""
         print(f"Loading GPTQ model with ExLlamaV2: {self.model_path}")
         
+        resolved_path = self._resolve_model_path(self.model_path)
+        
         self._config = ExLlamaV2Config()
-        self._config.model_dir = self.model_path
+        self._config.model_dir = resolved_path
         self._config.prepare()
         
         self._model = ExLlamaV2(self._config)
