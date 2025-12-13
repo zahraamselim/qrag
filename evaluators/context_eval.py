@@ -94,6 +94,32 @@ class ContextLengthEvaluator(BaseEvaluator):
         
         return self.results
     
+    def _count_tokens(self, text: str) -> int:
+        """Count tokens in text using model's tokenizer."""
+        encoded = self.model.encode(text)
+        input_ids = encoded.get('input_ids')
+        if isinstance(input_ids, torch.Tensor):
+            if input_ids.dim() == 2:
+                return input_ids.shape[1]
+            return input_ids.shape[0]
+        return len(input_ids)
+    
+    def _truncate_to_tokens(self, text: str, max_tokens: int) -> str:
+        """Truncate text to approximately max_tokens."""
+        encoded = self.model.encode(text)
+        input_ids = encoded.get('input_ids')
+        
+        if isinstance(input_ids, torch.Tensor):
+            if input_ids.dim() == 2:
+                input_ids = input_ids[0]
+            if input_ids.shape[0] > max_tokens:
+                input_ids = input_ids[:max_tokens]
+            return self.model.decode(input_ids, skip_special_tokens=True)
+        else:
+            if len(input_ids) > max_tokens:
+                input_ids = input_ids[:max_tokens]
+            return self.model.decode(torch.tensor(input_ids), skip_special_tokens=True)
+    
     def _run_standard_test(self, config: GenerationConfig) -> Dict[str, Any]:
         """Run standard context length test with SQuAD."""
         results_by_length = {}
@@ -168,7 +194,7 @@ class ContextLengthEvaluator(BaseEvaluator):
                             position_percentile=position_pct
                         )
                         
-                        actual_length = len(self.model.tokenizer.encode(context))
+                        actual_length = self._count_tokens(context)
                         
                         if actual_length < length * 0.8:
                             logger.warning(f"Context too short: {actual_length} < {length}")
@@ -238,11 +264,10 @@ class ContextLengthEvaluator(BaseEvaluator):
         position: str = 'middle'
     ) -> str:
         """Build context with answer at specified position."""
-        answer_tokens = self.model.tokenizer.encode(answer_context)
-        answer_length = len(answer_tokens)
+        answer_length = self._count_tokens(answer_context)
         
         if answer_length >= target_length:
-            return self.model.tokenizer.decode(answer_tokens[:target_length])
+            return self._truncate_to_tokens(answer_context, target_length)
         
         tokens_needed = target_length - answer_length
         
@@ -272,8 +297,7 @@ class ContextLengthEvaluator(BaseEvaluator):
         
         combined = "\n\n".join(parts) + f"\n\nQuestion: {question}\nAnswer:"
         
-        final_tokens = self.model.tokenizer.encode(combined)[:target_length]
-        return self.model.tokenizer.decode(final_tokens, skip_special_tokens=True)
+        return self._truncate_to_tokens(combined, target_length)
     
     def _build_needle_context(
         self,
@@ -282,11 +306,10 @@ class ContextLengthEvaluator(BaseEvaluator):
         position_percentile: int
     ) -> str:
         """Build context with needle at specified percentile position."""
-        needle_tokens = self.model.tokenizer.encode(needle_fact)
-        needle_length = len(needle_tokens)
+        needle_length = self._count_tokens(needle_fact)
         
         if needle_length >= target_length:
-            return self.model.tokenizer.decode(needle_tokens[:target_length])
+            return self._truncate_to_tokens(needle_fact, target_length)
         
         tokens_needed = target_length - needle_length
         
@@ -305,8 +328,7 @@ class ContextLengthEvaluator(BaseEvaluator):
         
         combined = "\n\n".join(parts)
         
-        final_tokens = self.model.tokenizer.encode(combined)[:target_length]
-        return self.model.tokenizer.decode(final_tokens, skip_special_tokens=True)
+        return self._truncate_to_tokens(combined, target_length)
     
     def _build_filler(self, num_tokens: int) -> str:
         """Build filler text of approximately num_tokens length."""
@@ -325,9 +347,9 @@ class ContextLengthEvaluator(BaseEvaluator):
             if current_tokens >= num_tokens:
                 break
             
-            passage_tokens = self.model.tokenizer.encode(passage)[:150]
-            filler_parts.append(self.model.tokenizer.decode(passage_tokens))
-            current_tokens += len(passage_tokens)
+            passage_truncated = self._truncate_to_tokens(passage, 150)
+            filler_parts.append(passage_truncated)
+            current_tokens += self._count_tokens(passage_truncated)
         
         return "\n\n".join(filler_parts)
     
@@ -360,7 +382,7 @@ class ContextLengthEvaluator(BaseEvaluator):
                     context, question, context_length, position
                 )
                 
-                actual_length = len(self.model.tokenizer.encode(full_context))
+                actual_length = self._count_tokens(full_context)
                 if actual_length < context_length * 0.85:
                     continue
                 

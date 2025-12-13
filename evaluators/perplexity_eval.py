@@ -4,11 +4,11 @@ Perplexity evaluator for language modeling quality assessment.
 
 import logging
 import torch
+import numpy as np
 from typing import Dict, Any
 from datasets import load_dataset
 
 from evaluators.base import BaseEvaluator
-from metrics.perplexity import compute_perplexity
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +59,7 @@ class PerplexityEvaluator(BaseEvaluator):
         if len(dataset) == 0:
             raise ValueError("No valid samples after filtering")
         
-        losses = []
-        token_counts = []
+        perplexities = []
         valid_samples = 0
         
         for i in range(min(self.max_samples, len(dataset))):
@@ -70,46 +69,40 @@ class PerplexityEvaluator(BaseEvaluator):
                 continue
             
             try:
-                inputs = self.model.encode(text, max_length=self.max_length)
+                ppl = self.model.get_perplexity(text, max_length=self.max_length)
                 
-                with torch.no_grad():
-                    outputs = self.model.model(**inputs, labels=inputs["input_ids"])
-                    loss = outputs.loss.item()
-                
-                attention_mask = inputs.get('attention_mask', torch.ones_like(inputs['input_ids']))
-                num_tokens = attention_mask.sum().item() - 1
-                
-                if num_tokens > 0:
-                    losses.append(loss)
-                    token_counts.append(num_tokens)
+                if ppl != float('inf') and not np.isnan(ppl):
+                    perplexities.append(ppl)
                     valid_samples += 1
                 
                 if (i + 1) % 20 == 0:
-                    current_ppl = compute_perplexity(losses, token_counts)
-                    logger.info(f"Progress: {i+1}/{min(self.max_samples, len(dataset))}, PPL: {current_ppl:.2f}")
+                    current_ppl = float(np.mean(perplexities)) if perplexities else 0.0
+                    logger.info(f"Progress: {i+1}/{min(self.max_samples, len(dataset))}, Avg PPL: {current_ppl:.2f}")
             
             except Exception as e:
                 logger.warning(f"Failed on sample {i}: {e}")
                 continue
         
-        if not losses:
+        if not perplexities:
             raise ValueError("No valid samples for perplexity calculation")
         
-        perplexity = compute_perplexity(losses, token_counts)
-        avg_loss = sum(l * c for l, c in zip(losses, token_counts)) / sum(token_counts)
+        perplexity = float(np.mean(perplexities))
+        loss = float(np.log(perplexity))
         
         self.results = {
-            "perplexity": float(perplexity),
-            "loss": float(avg_loss),
+            "perplexity": perplexity,
+            "loss": loss,
+            "perplexity_std": float(np.std(perplexities)),
+            "perplexity_min": float(np.min(perplexities)),
+            "perplexity_max": float(np.max(perplexities)),
             "dataset": f"{self.dataset_name}" + (f"/{self.dataset_config}" if self.dataset_config else ""),
             "split": self.split,
             "num_samples": valid_samples,
-            "total_tokens": sum(token_counts),
             "max_length": self.max_length
         }
         
         logger.info(f"Perplexity: {perplexity:.4f}")
-        logger.info(f"Loss: {avg_loss:.4f}")
+        logger.info(f"Loss: {loss:.4f}")
         logger.info(f"Valid samples: {valid_samples}")
         
         return self.results
